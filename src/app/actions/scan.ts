@@ -8,7 +8,7 @@ import type { ScanResult } from '@/lib/scanner/types';
 
 type ScanActionResult =
     | { success: true; report: ScanResult; saved: boolean }
-    | { success: false; error: string };
+    | { success: false; error: string; paywall?: true };
 
 /**
  * Extracts a unique, human-readable project reference from a Postgres connection string.
@@ -91,8 +91,39 @@ export async function performScan(
             const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
+                // ── Free-tier paywall ─────────────────────────────────────────
+                // Check if this is a NEW project_ref (rescans of existing are always allowed)
+                const { data: existingProject } = await supabase
+                    .from('projects')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('project_ref', projectRef)
+                    .maybeSingle();
+
+                const isNewProject = !existingProject;
+
+                if (isNewProject) {
+                    // Check pro status and project count in parallel
+                    const [profileResult, countResult] = await Promise.all([
+                        supabase.from('profiles').select('is_pro').eq('id', user.id).maybeSingle(),
+                        supabase.from('projects').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+                    ]);
+
+                    const isPro = profileResult.data?.is_pro ?? false;
+                    const projectCount = countResult.count ?? 0;
+
+                    if (!isPro && projectCount >= 1) {
+                        return {
+                            success: false,
+                            error: 'Free tier is limited to 1 project. Upgrade to the Agency Plan to monitor unlimited projects.',
+                            paywall: true,
+                        };
+                    }
+                }
+
                 // Upsert project — unique on (user_id, project_ref)
                 const { data: project, error: projectError } = await supabase
+
                     .from('projects')
                     .upsert(
                         {

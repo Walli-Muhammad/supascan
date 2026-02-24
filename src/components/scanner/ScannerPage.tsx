@@ -8,6 +8,7 @@ import { ScanInput } from '@/components/scanner/ScanInput';
 import { ScoreCard } from '@/components/scanner/ScoreCard';
 import { FindingsList } from '@/components/scanner/FindingsList';
 import { DownloadButton } from '@/components/scanner/DownloadButton';
+import { UpgradeButton } from '@/components/UpgradeButton';
 import { ShieldCheck, Activity, LogOut } from 'lucide-react';
 
 const initialState = {
@@ -72,12 +73,22 @@ export function ScannerPage() {
                         <ScanInput defaultValue={defaultConnectionString} />
                     </form>
 
-                    {/* Error Message */}
+                    {/* Error / Paywall Message */}
                     {'error' in state && state.error && (
-                        <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg max-w-2xl mx-auto animate-in shake">
-                            <div className="flex items-center gap-3">
-                                <Activity className="w-5 h-5 text-rose-500" />
-                                <p className="text-rose-200 text-sm font-medium">{state.error}</p>
+                        <div className={`mt-6 p-4 rounded-lg max-w-2xl mx-auto animate-in shake ${state.paywall ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-rose-500/10 border border-rose-500/20'
+                            }`}>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-3">
+                                    <Activity className={`w-5 h-5 ${state.paywall ? 'text-amber-500' : 'text-rose-500'}`} />
+                                    <p className={`text-sm font-medium ${state.paywall ? 'text-amber-200' : 'text-rose-200'}`}>
+                                        {state.error}
+                                    </p>
+                                </div>
+                                {state.paywall && (
+                                    <div className="pt-2 border-t border-amber-500/20">
+                                        <UpgradeButton />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

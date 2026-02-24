@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { UpgradeButton } from '@/components/UpgradeButton';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
+import { Footer } from '@/components/Footer';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -311,12 +313,7 @@ export default async function Home() {
                 ))}
               </ul>
 
-              <Link
-                href="/login"
-                className="w-full text-center text-sm font-bold text-slate-900 bg-emerald-400 hover:bg-emerald-300 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
-              >
-                Start Agency Trial
-              </Link>
+              <UpgradeButton />
             </div>
           </div>
         </section>
@@ -344,23 +341,7 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ── FOOTER ────────────────────────────────────────────────────── */}
-        <footer className="border-t border-slate-800/60 py-10 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span className="font-bold text-white text-sm">Supascan</span>
-              <span className="text-slate-600 text-xs ml-2">© {new Date().getFullYear()}</span>
-            </div>
-
-            <nav className="flex items-center gap-6 text-xs text-slate-500">
-              <a href="#features" className="hover:text-slate-300 transition-colors">Features</a>
-              <a href="#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>
-              <Link href="/login" className="hover:text-slate-300 transition-colors">Login</Link>
-              <a href="#" className="hover:text-slate-300 transition-colors">Privacy</a>
-            </nav>
-          </div>
-        </footer>
+        <Footer />
       </main>
     </div>
   );

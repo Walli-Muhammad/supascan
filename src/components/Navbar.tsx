@@ -24,7 +24,6 @@ export async function Navbar() {
                 <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
                     <a href="#features" className="hover:text-white transition-colors">Features</a>
                     <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-                    <a href="#" className="hover:text-white transition-colors">Docs</a>
                 </nav>
 
                 {/* CTA */}

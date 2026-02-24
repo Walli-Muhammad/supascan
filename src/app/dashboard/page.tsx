@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { ProjectCard } from '@/components/dashboard/ProjectCard';
+import { DashboardActions } from '@/components/dashboard/DashboardActions';
 import { signout } from '@/app/login/actions';
 import {
     ShieldCheck,
@@ -17,18 +19,17 @@ export default async function Dashboard() {
 
     if (!user) redirect('/login');
 
-    // Fetch all projects for this user
-    const { data: projects, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('last_scan_at', { ascending: false });
+    const [projectResult, profileResult] = await Promise.all([
+        supabase.from('projects').select('*').eq('user_id', user.id).order('last_scan_at', { ascending: false }),
+        supabase.from('profiles').select('is_pro').eq('id', user.id).maybeSingle(),
+    ]);
 
-    if (error) {
-        console.error('[dashboard] Failed to fetch projects:', error.message);
+    if (projectResult.error) {
+        console.error('[dashboard] Failed to fetch projects:', projectResult.error.message);
     }
 
-    const projectList = projects ?? [];
+    const projectList = projectResult.data ?? [];
+    const isPro = profileResult.data?.is_pro ?? false;
 
     // Aggregate stats
     const avgScore = projectList.length > 0
@@ -81,13 +82,7 @@ export default async function Dashboard() {
                         </p>
                     </div>
 
-                    <a
-                        href="/new"
-                        className="flex items-center gap-2 text-sm font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-lg transition-all active:scale-95"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Add Project
-                    </a>
+                    <DashboardActions isPro={isPro} projectCount={projectList.length} />
                 </div>
 
                 {/* Stats bar — only show when there are projects */}
@@ -146,6 +141,15 @@ export default async function Dashboard() {
                         ))}
                     </div>
                 )}
+
+                {/* Dashboard footer */}
+                <div className="mt-16 pt-8 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
+                    <p>© {new Date().getFullYear()} Supascan</p>
+                    <div className="flex gap-4">
+                        <Link href="/terms" className="hover:text-slate-300 transition-colors">Terms</Link>
+                        <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy</Link>
+                    </div>
+                </div>
             </main>
         </div>
     );
