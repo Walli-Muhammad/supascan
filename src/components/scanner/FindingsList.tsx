@@ -14,10 +14,12 @@ import {
     Check,
 } from 'lucide-react';
 import type { Finding } from '@/lib/scanner/types';
+import { UpgradeButton } from '@/components/UpgradeButton';
 
 interface FindingsListProps {
     findings: Finding[];
     passed_checks: string[];
+    isPro: boolean;
 }
 
 // ── Severity config ────────────────────────────────────────────────────────────
@@ -86,7 +88,7 @@ function CopyButton({ text }: { text: string }) {
 
 // ── Finding card ───────────────────────────────────────────────────────────────
 
-function FindingCard({ finding }: { finding: Finding }) {
+function FindingCard({ finding, isPro }: { finding: Finding; isPro: boolean }) {
     const [open, setOpen] = useState(false);
     const sev = getSev(finding.severity);
     const Icon = sev.icon;
@@ -155,21 +157,36 @@ function FindingCard({ finding }: { finding: Finding }) {
                 </button>
 
                 {open && (
-                    <div className="mt-1.5 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden animate-in slide-in-from-top-1 duration-150">
-                        {/* Code header */}
-                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800/60 bg-slate-900/80">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-rose-500/40" />
-                                <div className="w-2 h-2 rounded-full bg-amber-500/40" />
-                                <div className="w-2 h-2 rounded-full bg-emerald-500/40" />
-                                <span className="text-[10px] text-slate-600 font-mono ml-1">remediation.sql</span>
+                    isPro ? (
+                        <div className="mt-1.5 rounded-lg bg-slate-950 border border-slate-800 overflow-hidden animate-in slide-in-from-top-1 duration-150">
+                            {/* Code header */}
+                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800/60 bg-slate-900/80">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-rose-500/40" />
+                                    <div className="w-2 h-2 rounded-full bg-amber-500/40" />
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500/40" />
+                                    <span className="text-[10px] text-slate-600 font-mono ml-1">remediation.sql</span>
+                                </div>
+                                <CopyButton text={finding.remediation} />
                             </div>
-                            <CopyButton text={finding.remediation} />
+                            <pre className="p-3 text-xs font-mono text-emerald-400/90 whitespace-pre-wrap break-all leading-relaxed overflow-x-auto">
+                                <code>{finding.remediation}</code>
+                            </pre>
                         </div>
-                        <pre className="p-3 text-xs font-mono text-emerald-400/90 whitespace-pre-wrap break-all leading-relaxed overflow-x-auto">
-                            <code>{finding.remediation}</code>
-                        </pre>
-                    </div>
+                    ) : (
+                        <div className="mt-1.5 rounded-lg bg-slate-950 border border-amber-500/20 overflow-hidden animate-in slide-in-from-top-1 duration-150 relative">
+                            {/* Blurred preview */}
+                            <pre className="p-3 text-xs font-mono text-emerald-400/90 whitespace-pre-wrap break-all leading-relaxed overflow-x-auto blur-sm select-none pointer-events-none">
+                                <code>{finding.remediation}</code>
+                            </pre>
+                            {/* Lock overlay */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-slate-950/75 backdrop-blur-[1px]">
+                                <Lock className="w-4 h-4 text-amber-400" />
+                                <p className="text-xs text-amber-400 font-medium">Agency tier required</p>
+                                <UpgradeButton className="mt-1" />
+                            </div>
+                        </div>
+                    )
                 )}
             </div>
         </div>
@@ -178,7 +195,7 @@ function FindingCard({ finding }: { finding: Finding }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function FindingsList({ findings, passed_checks }: FindingsListProps) {
+export function FindingsList({ findings, passed_checks, isPro }: FindingsListProps) {
     // Group findings by severity for ordered display
     const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
     const sorted = [...findings].sort(
@@ -216,7 +233,7 @@ export function FindingsList({ findings, passed_checks }: FindingsListProps) {
                 ) : (
                     <div className="space-y-3">
                         {sorted.map((finding) => (
-                            <FindingCard key={finding.id} finding={finding} />
+                            <FindingCard key={finding.id} finding={finding} isPro={isPro} />
                         ))}
                     </div>
                 )}

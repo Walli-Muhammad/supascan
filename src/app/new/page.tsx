@@ -13,5 +13,13 @@ export default async function NewScanPage() {
 
     if (!user) redirect('/login');
 
-    return <ScannerPage />;
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_pro')
+        .eq('id', user.id)
+        .maybeSingle();
+
+    const isPro = profile?.is_pro ?? false;
+
+    return <ScannerPage isPro={isPro} />;
 }

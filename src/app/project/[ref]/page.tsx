@@ -72,12 +72,22 @@ export default async function ProjectPage({
 
     if (!project) notFound();
 
-    // Fetch scan history ordered newest first
+    // Fetch profile for tier-based limits
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_pro')
+        .eq('id', user.id)
+        .maybeSingle();
+    const isPro = profile?.is_pro ?? false;
+
+    // Fetch scan history — free tier limited to 1 entry
+    const scanLimit = isPro ? 100 : 1;
     const { data: history } = await supabase
         .from('scan_history')
         .select('id, score, findings_count, created_at')
         .eq('project_id', project.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(scanLimit);
 
     const scanHistory = history ?? [];
     const grade = getGrade(project.last_scan_score);
@@ -168,6 +178,11 @@ export default async function ProjectPage({
                         <CalendarDays className="w-4 h-4 text-slate-500" />
                         <h2 className="text-base font-bold text-white">Scan History</h2>
                         <span className="text-xs text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">{scanHistory.length}</span>
+                        {!isPro && (
+                            <span className="ml-auto text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                                Free: showing latest scan only
+                            </span>
+                        )}
                     </div>
 
                     {scanHistory.length === 0 ? (

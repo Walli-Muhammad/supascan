@@ -11,6 +11,10 @@ import {
     Activity,
     Layers,
     AlertTriangle,
+    Lock,
+    Clock,
+    FileText,
+    ScanLine,
 } from 'lucide-react';
 
 export default async function Dashboard() {
@@ -118,21 +122,46 @@ export default async function Dashboard() {
 
                 {/* Project grid or empty state */}
                 {projectList.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 mb-5">
-                            <ShieldCheck className="w-10 h-10 text-emerald-500" />
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/30 py-20 px-8 text-center">
+                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
+                            <ShieldCheck className="h-7 w-7 text-emerald-400" />
                         </div>
-                        <h2 className="text-xl font-semibold text-white mb-2">Welcome to Mission Control</h2>
-                        <p className="text-slate-400 text-sm max-w-sm mb-6">
-                            Add your first Supabase project to start monitoring its security health score.
+                        <h2 className="text-lg font-semibold text-slate-100">
+                            Run your first security audit
+                        </h2>
+                        <p className="mt-2 max-w-sm text-sm text-slate-400">
+                            Connect a Supabase project and get your security score in under 60 seconds.
+                            We check RLS policies, role permissions, exposed schemas, and more —
+                            without ever reading your data.
                         </p>
-                        <a
-                            href="/new"
-                            className="flex items-center gap-2 text-sm font-semibold text-slate-900 bg-emerald-400 hover:bg-emerald-300 px-5 py-2.5 rounded-lg transition-all active:scale-95"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Run Your First Scan
-                        </a>
+                        <div className="mt-6 flex flex-col sm:flex-row items-center gap-3">
+                            <Link
+                                href="/new"
+                                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors active:scale-95"
+                            >
+                                <ScanLine className="h-4 w-4" />
+                                Start Your First Scan
+                            </Link>
+                            <Link
+                                href="/terms"
+                                className="text-sm text-slate-500 hover:text-slate-400 transition-colors"
+                            >
+                                How we keep your data safe →
+                            </Link>
+                        </div>
+
+                        {/* Trust signals */}
+                        <div className="mt-8 flex flex-wrap justify-center items-center gap-6 text-xs text-slate-500">
+                            <span className="flex items-center gap-1.5">
+                                <Lock className="h-3.5 w-3.5" /> Zero-data promise
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <Clock className="h-3.5 w-3.5" /> Results in ~60s
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                                <FileText className="h-3.5 w-3.5" /> SOC2-style report
+                            </span>
+                        </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

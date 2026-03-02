@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { performScan } from '@/app/actions/scan';
 import { signout } from '@/app/login/actions';
@@ -9,20 +9,46 @@ import { ScoreCard } from '@/components/scanner/ScoreCard';
 import { FindingsList } from '@/components/scanner/FindingsList';
 import { DownloadButton } from '@/components/scanner/DownloadButton';
 import { UpgradeButton } from '@/components/UpgradeButton';
-import { ShieldCheck, Activity, LogOut } from 'lucide-react';
+import { ShieldCheck, Activity, LogOut, Clock } from 'lucide-react';
 
 const initialState = {
     success: false as const,
     error: '',
 };
 
+const READ_ONLY_SQL = `-- Step 1: Create the read-only role
+CREATE ROLE supascan_readonly WITH LOGIN PASSWORD 'replace_with_strong_password';
+-- Step 2: Allow the role to connect to the database
+GRANT CONNECT ON DATABASE postgres TO supascan_readonly;
+-- Step 3: Allow the role to see the public schema
+GRANT USAGE ON SCHEMA public TO supascan_readonly;
+-- Step 4: Grant SELECT on all current tables in public (for pg_catalog access)
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO supascan_readonly;
+-- Step 5: Grant access to system catalog schemas used by the scanner
+GRANT USAGE ON SCHEMA pg_catalog TO supascan_readonly;
+GRANT USAGE ON SCHEMA information_schema TO supascan_readonly;
+-- Step 6: Grant SELECT on storage schema (for bucket checks)
+GRANT USAGE ON SCHEMA storage TO supascan_readonly;
+GRANT SELECT ON storage.buckets TO supascan_readonly;
+-- Supascan only queries system catalogs.
+-- This role cannot read, modify, or delete any of your application data.`;
+
 /**
  * Client component containing the full scanner UI.
  * Extracted from page.tsx so the root page can be a server component
  * (needed for the auth redirect).
  */
-export function ScannerPage() {
+export function ScannerPage({ isPro }: { isPro: boolean }) {
     const [state, formAction] = useActionState(performScan, initialState);
+    const [showReadOnly, setShowReadOnly] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+
+    function handleCopy() {
+        navigator.clipboard.writeText(READ_ONLY_SQL);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }
     const searchParams = useSearchParams();
 
     // Build a template connection string when ?project= is present
@@ -72,6 +98,60 @@ export function ScannerPage() {
                     <form action={formAction}>
                         <ScanInput defaultValue={defaultConnectionString} />
                     </form>
+
+                    {/* ── Read-only role snippet ──────────────────────────────── */}
+                    <div className="max-w-2xl mx-auto mt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowReadOnly(v => !v)}
+                            className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors group"
+                        >
+                            <span className="text-slate-600 group-hover:text-emerald-500 transition-colors">🔒</span>
+                            <span>Prefer a Read-Only Role?</span>
+                            <span className={`transition-transform duration-200 ${showReadOnly ? 'rotate-180' : ''}`}>▾</span>
+                        </button>
+
+                        {showReadOnly && (
+                            <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <p className="text-xs text-slate-400 mb-3">
+                                    Run this in your{' '}
+                                    <a
+                                        href="https://supabase.com/dashboard/project/_/sql"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-emerald-400 hover:text-emerald-300 underline"
+                                    >
+                                        Supabase SQL Editor
+                                    </a>
+                                    . It creates a dedicated read-only role with the minimum permissions Supascan needs.{' '}
+                                    <strong className="text-white">Your application roles and data are completely unaffected.</strong>
+                                </p>
+                                <div className="relative">
+                                    <pre className="text-xs font-mono text-slate-300 bg-slate-900 rounded-lg p-4 overflow-x-auto leading-relaxed border border-slate-800">{READ_ONLY_SQL}</pre>
+                                    <button
+                                        type="button"
+                                        onClick={handleCopy}
+                                        className="absolute top-2 right-2 text-[10px] font-bold px-2 py-1 rounded-md bg-slate-800 border border-slate-700 hover:border-emerald-500/40 text-slate-400 hover:text-emerald-400 transition-all"
+                                    >
+                                        {copied ? '✓ Copied!' : 'Copy'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Rate limit banner */}
+                    {'rate_limited' in state && state.rate_limited && (
+                        <div className="mt-6 max-w-2xl mx-auto rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3 animate-in fade-in duration-300">
+                            <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-semibold text-amber-400">Scan limit reached</p>
+                                <p className="text-sm text-amber-300/80 mt-0.5">
+                                    You can run up to 5 scans per hour. Please wait a moment before scanning again.
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Error / Paywall Message */}
                     {'error' in state && state.error && (
@@ -153,7 +233,7 @@ export function ScannerPage() {
 
                             {/* Right column — findings, scrolls freely */}
                             <div className="lg:col-span-8">
-                                <FindingsList findings={state.report.findings} passed_checks={state.report.passed_checks} />
+                                <FindingsList findings={state.report.findings} passed_checks={state.report.passed_checks} isPro={isPro} />
                             </div>
                         </div>
                     </div>

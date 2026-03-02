@@ -4,11 +4,52 @@ import { scanProject } from '@/lib/scanner/engine';
 import { validateConnectionString } from '@/lib/scanner/validator';
 import { logScanAttempt } from '@/lib/audit';
 import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { headers } from 'next/headers';
 import type { ScanResult } from '@/lib/scanner/types';
 
 type ScanActionResult =
     | { success: true; report: ScanResult; saved: boolean }
-    | { success: false; error: string; paywall?: true };
+    | { success: false; error: string; paywall?: true; rate_limited?: true };
+
+/**
+ * Derives a letter grade from a numeric score.
+ * Must match the thresholds in ScoreCard.tsx getTier().
+ */
+function scoreToGrade(score: number): string {
+    if (score >= 90) return 'A';
+    if (score >= 75) return 'B';
+    if (score >= 60) return 'C';
+    if (score >= 40) return 'D';
+    return 'F';
+}
+
+/**
+ * Rate limit check against scan_consent_log.
+ * Authenticated: 5 scans per hour per user_id.
+ * Unauthenticated: 2 scans per hour per IP.
+ * Throws 'RATE_LIMIT_EXCEEDED' — caller converts to a typed return value.
+ */
+async function checkRateLimit(userId: string | null, ipAddress: string | null): Promise<void> {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    if (userId) {
+        const { count } = await supabaseAdmin
+            .from('scan_consent_log')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('consented_at', oneHourAgo);
+        if ((count ?? 0) >= 5) throw new Error('RATE_LIMIT_EXCEEDED');
+    } else if (ipAddress) {
+        const { count } = await supabaseAdmin
+            .from('scan_consent_log')
+            .select('*', { count: 'exact', head: true })
+            .eq('ip_address', ipAddress)
+            .is('user_id', null)
+            .gte('consented_at', oneHourAgo);
+        if ((count ?? 0) >= 2) throw new Error('RATE_LIMIT_EXCEEDED');
+    }
+}
 
 /**
  * Extracts a unique, human-readable project reference from a Postgres connection string.
@@ -27,7 +68,6 @@ function extractProjectRef(connectionString: string): string {
         // Format 1 — Direct connection: db.<ref>.supabase.co
         if (host.includes('supabase.co')) {
             const parts = host.split('.');
-            // db.ref-id.supabase.co → parts[1] = ref-id
             if (parts.length >= 3 && parts[0] === 'db') {
                 return parts[1];
             }
@@ -52,7 +92,7 @@ function extractProjectRef(connectionString: string): string {
  *
  * SAFETY GUARANTEES:
  * 1. Validates connection string format before scanning
- * 2. Logs scan attempt to audit trail (compliance)
+ * 2. Logs consent to immutable audit trail BEFORE connecting (compliance)
  * 3. Uses ephemeral connections (never persists credentials)
  * 4. Stores ONLY the project_ref — never the password
  * 5. If DB save fails, the user still receives their scan result
@@ -77,18 +117,52 @@ export async function performScan(
         // Step 2: Parse unique project ref (safe — no credentials)
         const projectRef = extractProjectRef(validation.data);
 
-        // Step 3: Audit log (compliance)
-        await logScanAttempt(validation.data, '127.0.0.1', true);
+        // Step 3: Extract IP + user early (needed for rate limit check)
+        const reqHeaders = await headers();
+        const ipRaw = reqHeaders.get('x-forwarded-for') ?? reqHeaders.get('x-real-ip') ?? null;
+        const ip = ipRaw ? ipRaw.split(',')[0].trim() : null;
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
 
-        // Step 4: Execute security scan
+        // Step 3a: Rate limit — checked BEFORE opening the target DB connection
+        try {
+            await checkRateLimit(user?.id ?? null, ip);
+        } catch (e) {
+            if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+                return {
+                    success: false,
+                    error: 'You have reached the limit of 5 scans per hour. Please wait before scanning again.',
+                    rate_limited: true,
+                };
+            }
+            throw e;
+        }
+
+        // Step 4: Legacy audit log (compliance)
+        await logScanAttempt(validation.data, ip ?? '127.0.0.1', true);
+
+        // Step 5: Log consent (reuse reqHeaders, user, ip from Step 3)
+        try {
+            await supabaseAdmin.from('scan_consent_log').insert({
+                user_id: user?.id ?? null,
+                project_ref: projectRef,
+                ip_address: ip,
+                user_agent: reqHeaders.get('user-agent') ?? null,
+            });
+        } catch (consentErr) {
+            // Non-blocking: log failure but never prevent the scan
+            console.error('[scan] Consent log insert failed:', consentErr);
+        }
+
+        // Step 5: Execute security scan
         const report = await scanProject(validation.data);
+        const grade = scoreToGrade(report.score);
 
-        // Step 5: Persist results if user is authenticated
+        // Step 7: Persist results if user is authenticated
         let saved = false;
 
         try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            // Reuse already-resolved user from the rate-limit step
 
             if (user) {
                 // ── Free-tier paywall ─────────────────────────────────────────
@@ -123,7 +197,6 @@ export async function performScan(
 
                 // Upsert project — unique on (user_id, project_ref)
                 const { data: project, error: projectError } = await supabase
-
                     .from('projects')
                     .upsert(
                         {
@@ -144,6 +217,24 @@ export async function performScan(
                 if (projectError) {
                     console.error('[scan] Project upsert failed:', projectError.message);
                 } else if (project) {
+                    // ── Insert full scan result into `scans` (new table) ──────
+                    // Use supabaseAdmin so the write is guaranteed regardless
+                    // of RLS edge cases at the service layer.
+                    const { error: scanError } = await supabaseAdmin.from('scans').insert({
+                        project_id: project.id,
+                        user_id: user.id,
+                        score: report.score,
+                        grade,
+                        findings: report.findings,
+                        tables_analyzed: report.tables_scanned,
+                        duration_ms: report.scan_duration_ms,
+                    });
+
+                    if (scanError) {
+                        console.error('[scan] Scans insert failed:', scanError.message);
+                    }
+
+                    // ── Keep scan_history for backwards-compat (legacy cache) ─
                     const { error: historyError } = await supabase
                         .from('scan_history')
                         .insert({
@@ -161,7 +252,7 @@ export async function performScan(
                 }
             }
         } catch (dbError) {
-            // Non-blocking: DB failure must never prevent the user from seeing results
+            // Non-blocking: DB failure must never prevent the user seeing results
             console.error('[scan] DB persistence error:', dbError);
         }
 

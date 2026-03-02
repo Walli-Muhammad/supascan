@@ -17,6 +17,7 @@ export type FindingCategory =
   | 'AUTH'          // Authentication & MFA issues
   | 'NETWORK'       // Extension/network exposure issues
   | 'PERMISSIONS'   // Dangerous grants and privilege issues
+  | 'STORAGE'       // Storage bucket exposure issues
   | 'MISCONFIGURATION'; // General misconfigurations
 
 /**

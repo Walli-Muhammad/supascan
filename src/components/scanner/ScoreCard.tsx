@@ -33,9 +33,35 @@ function getTier(score: number): ScoreTier {
         bg: 'bg-emerald-500/5',
         arc: '#10b981',
     };
-    if (score >= 70) return {
+    if (score >= 75) return {
         grade: 'B',
-        label: 'WARNING',
+        label: 'GOOD',
+        labelIcon: TrendingUp,
+        ring: 'border-green-500/60',
+        glow: 'shadow-green-500/20',
+        scoreText: 'text-green-400',
+        gradeText: 'text-green-300',
+        badgeBg: 'bg-green-500/15 border-green-500/30',
+        badgeText: 'text-green-400',
+        bg: 'bg-green-500/5',
+        arc: '#22c55e',
+    };
+    if (score >= 60) return {
+        grade: 'C',
+        label: 'FAIR',
+        labelIcon: AlertTriangle,
+        ring: 'border-yellow-500/60',
+        glow: 'shadow-yellow-500/20',
+        scoreText: 'text-yellow-400',
+        gradeText: 'text-yellow-300',
+        badgeBg: 'bg-yellow-500/15 border-yellow-500/30',
+        badgeText: 'text-yellow-400',
+        bg: 'bg-yellow-500/5',
+        arc: '#eab308',
+    };
+    if (score >= 40) return {
+        grade: 'D',
+        label: 'POOR',
         labelIcon: AlertTriangle,
         ring: 'border-amber-500/60',
         glow: 'shadow-amber-500/20',
@@ -123,11 +149,20 @@ export function ScoreCard({ score }: ScoreCardProps) {
             </div>
 
             {/* Grade letter */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-3.5 h-3.5 text-slate-600" />
                 <span className="text-xs text-slate-500">Security Grade</span>
                 <span className={cn('text-xl font-black', tier.gradeText)}>{tier.grade}</span>
             </div>
+
+            {/* Score methodology footnote */}
+            <p className="text-[10px] text-slate-600 text-center leading-relaxed border-t border-slate-800/60 pt-3">
+                Score deductions per finding:<br />
+                <span className="text-rose-500 font-semibold">Critical −40</span>{' · '}
+                <span className="text-amber-500 font-semibold">High −20</span>{' · '}
+                <span className="text-yellow-500 font-semibold">Medium −8</span>{' · '}
+                <span className="text-slate-400">Low −2</span>
+            </p>
         </div>
     );
 }
