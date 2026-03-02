@@ -39,7 +39,7 @@ export default async function Dashboard() {
     const avgScore = projectList.length > 0
         ? Math.round(projectList.reduce((sum, p) => sum + (p.last_scan_score ?? 0), 0) / projectList.length)
         : null;
-    const criticalCount = projectList.filter(p => p.last_scan_score !== null && p.last_scan_score < 70).length;
+    const criticalCount = projectList.filter(p => p.last_scan_score !== null && p.last_scan_score < 60).length;
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-200">
@@ -104,7 +104,7 @@ export default async function Dashboard() {
                                 <Activity className="w-3.5 h-3.5" />
                                 Avg. Score
                             </div>
-                            <p className={`text-2xl font-bold ${avgScore !== null && avgScore >= 90 ? 'text-emerald-400' : avgScore !== null && avgScore >= 70 ? 'text-amber-400' : 'text-rose-400'}`}>
+                            <p className={`text-2xl font-bold ${avgScore !== null && avgScore >= 90 ? 'text-emerald-400' : avgScore !== null && avgScore >= 75 ? 'text-amber-400' : 'text-rose-400'}`}>
                                 {avgScore ?? '—'}
                             </p>
                         </div>
