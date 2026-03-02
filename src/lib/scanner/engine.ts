@@ -601,24 +601,19 @@ export async function scanProject(connectionString: string): Promise<ScanResult>
             passed_checks.push(`No dangerous write permissions (INSERT, UPDATE, DELETE, TRUNCATE) found for public roles`);
         }
 
-        // ── Enterprise & Advanced Checks (parallel, individually timed-out) ──────
-        // PITR and MFA are NOT checked — they are Supabase platform-level
-        // settings, not queryable via pg_catalog. Sticking to DB-level checks.
-        const [
-            extensions, superuser,
-            securityDefiners, networkExt, pgCron, vault,
-            publicFunctionsAnon, publicBuckets, viewBaseTableRLS,
-        ] = await Promise.all([
-            checkDangerousExtensions(sql),
-            checkSuperuser(sql),
-            checkSecurityDefiners(sql),
-            checkNetworkExtensionExposed(sql),
-            checkPgCronExposed(sql),
-            checkVaultExposed(sql),
-            checkPublicFunctionsAnonExecutable(sql),
-            checkPublicStorageBuckets(sql),
-            checkViewBaseTableNoRLS(sql),
-        ]);
+        // ── Enterprise & Advanced Checks (sequential — max:1 connection) ──────
+        // Promise.all would queue all 9 queries behind a single connection,
+        // causing withTimeout to fire for checks at the back of the line.
+        // Sequential awaits guarantee each check completes before the next starts.
+        const extensions = await checkDangerousExtensions(sql);
+        const superuser = await checkSuperuser(sql);
+        const securityDefiners = await checkSecurityDefiners(sql);
+        const networkExt = await checkNetworkExtensionExposed(sql);
+        const pgCron = await checkPgCronExposed(sql);
+        const vault = await checkVaultExposed(sql);
+        const publicFunctionsAnon = await checkPublicFunctionsAnonExecutable(sql);
+        const publicBuckets = await checkPublicStorageBuckets(sql);
+        const viewBaseTableRLS = await checkViewBaseTableNoRLS(sql);
 
         if (superuser.finding) findings.push(superuser.finding);
         findings.push(
