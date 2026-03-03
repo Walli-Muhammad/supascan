@@ -2,7 +2,7 @@
 
 import { useFormStatus } from 'react-dom';
 import { useEffect, useRef } from 'react';
-import { Terminal, Lock, ShieldCheck, Database, Loader2 } from 'lucide-react';
+import { Terminal, Lock, ShieldCheck, Database, Loader2, Info } from 'lucide-react';
 
 interface ScanInputProps {
     /** Pre-filled connection string template (from ?project= URL param) */
@@ -41,6 +41,17 @@ export function ScanInput({ defaultValue }: ScanInputProps) {
                         disabled={pending}
                     />
                 </div>
+            </div>
+
+            {/* IPv4 Transaction Pooler notice */}
+            <div className="flex items-start gap-2 px-1 py-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-400/90 leading-relaxed">
+                    <span className="font-semibold">Important:</span> Please use your{' '}
+                    <span className="font-semibold">IPv4 Transaction Pooler</span> connection string{' '}
+                    <span className="font-mono bg-amber-500/10 px-1 rounded">(Port 6543)</span>.{' '}
+                    Direct connections are not supported on Vercel.
+                </p>
             </div>
 
             {defaultValue && (
